@@ -6,3 +6,4 @@ it has
    - main platform in color white
    - a square-shaped dead bug
 use dosbox to run this project
+commands for working with dosbox is commented at the beginning of doodlejump.asm file
