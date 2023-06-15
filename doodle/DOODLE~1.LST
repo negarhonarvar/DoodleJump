@@ -1,0 +1,633 @@
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-1
+
+
+				; commands for dosbox: 
+				; mount c "LOCATION" 
+				; c: 
+				; dir to access directory 
+				; masm /a "CODE FILE NAME" 
+				; link "FILE NAME" 
+				; write  ";" as run file to skip 3 following en
+				ters , then we have  
+				; access to runnable file and execute it 
+				; the command to do the above is simply writing
+				 the file name 
+ 0000				STACK SEGMENT para STACK 
+ 0000  0040[			   DB 64 DUP (' ') 
+	   20			
+			 ]	
+				
+ 0040				STACK ENDS 
+				 
+ 0000				DATA SEGMENT para 'DATA' 
+				                           ; definning screen d
+				imension variables 
+ 0000  0140				WINDOW_WIDTH DW 140H   ; the width of t
+				he window (320 pixels) 
+ 0002  00C8				WINDOW_HIGHT DW 0C8H   ; the hight of t
+				he window (200 pixels) 
+ 0004  0006				WINDOW_BOUNDS DW 6     ; variable used 
+				to check collisions early 
+				                           ; definning time var
+				iables  
+ 0006  00				TIME_AUX DB 0          ; variable used 
+				when checking if the time has changed 
+					                       ; variables used
+				 for balls initial position 
+ 0007  00A0				BALL_ORIGINAL_X DW 0A0h 
+ 0009  0005				BALL_ORIGINAL_Y DW 05h 
+				                           ; defining ball vari
+				ables ( DW: define word (16 bits)): 
+ 000B  000A			    BALL_X DW 0Ah          ; X position (column
+				) of the ball 
+ 000D  000A			    BALL_Y DW 0Ah          ; Y position (line) 
+				of the ball 
+ 000F  0004			    BALL_SIZE DW 04h       ; it indicates the s
+				ize of ball , it draws a ball with radius 4 => 
+				s=16 
+ 0011  0005				BALL_VELOCITY_X DW 05H ; horizontal vel
+				ocity of the ball  
+ 0013  0002				BALL_VELOCITY_Y DW 02H ; vertical veloc
+				ity of the ball 
+					                       ; creating platf
+				orm variables 
+ 0015  007A				PLATFORM_X DW 07Ah 
+ 0017  003A				PLATFORM_Y DW 03Ah 
+ 0019  001F				PLATFORM_WIDTH DW 1fh 
+ 001B  0006				PLATFORM_HEIGHT DW 06h 
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-2
+
+
+				 
+ 001D				DATA ENDS 
+				 
+ 0000				CODE SEGMENT para 'CODE' 
+				     
+ 0000				    MAIN PROC FAR 
+					; we need to declare the segments in or
+				der to correctly use the variable defined in DS
+				 segment 
+					; telling the code to assume following 
+				segments as respective registers 
+				    ASSUME CS:CODE, DS:DATA, SS:STACK  
+ 0000  1E				PUSH DS        ; push to the stack the 
+				DS SEGMENT 
+ 0001  2B C0				SUB AX,AX      ; clean th AX register 
+ 0003  50				PUSH AX        ; push AX to the stack  
+ 0004  B8 ---- R			MOV AX,DATA    ; save on the AX registe
+				r the contents of DATA segment 
+ 0007  8E D8				MOV DS,AX      ; save on the DS segment
+				 the contents of AX  
+ 0009  58				POP AX         ; release the top item f
+				rom the stack to the AX register 
+ 000A  58				POP AX         ; doing it twice to avoi
+				d our game from crashing 
+					 
+				        ;for drawing pixels we use INT 10H inte
+				rrupt 
+						 
+ 000B  E8 018B R			    CALL CLEAR_SCREEN 
+						 
+						;implementing time 
+ 000E						CHECK_TIME: 
+ 000E  B4 2C					     MOV AH,2CH                
+				; interruption to get system time 
+ 0010  CD 21					     INT 21H                   
+				; CH = hour CL = minute DH = second DL = 1/100 
+				seconds 
+						            
+ 0012  3A 16 0006 R				     CMP DL,TIME_AUX	
+					   ; is the current time=prevoius time 
+				?(TIME_AUX) 
+ 0016  74 F6					     JE CHECK_TIME             
+				; jump to the lable if its equal to get new tim
+				e and check again 
+							  
+							 ;if the time has chang
+				ed we proceed with the drawing 
+ 0018  88 16 0006 R					 MOV TIME_AUX,DL       
+				   ; update time 
+						 
+ 001C  E8 018B R				     CALL CLEAR_SCREEN        ;
+				 calling this proc to clear the ball trail
+						      
+							  
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-3
+
+
+ 001F  E8 005D R					 CALL MOVE_BALL 
+							  
+ 0022  E8 00FD R					 CALL MOVE_BALL_WITH_KE
+				YS 
+							   
+ 0025  E8 002E R				     CALL DRAW_BALL           ;
+				calling the DRAW_BALL PROC 
+						      
+ 0028  E8 012A R					 CALL DRAW_PLATFORM 
+							  
+ 002B  EB E1					     JMP CHECK_TIME           ;
+				 checks time again 
+						 
+ 002D  CB			        RET ;return from this proc  
+ 002E				    MAIN ENDP ;p is for proc  
+					 
+ 002E					DRAW_BALL PROC NEAR  
+					 
+					    ;drawing the pixels :AL = Color, BH
+				 = Page Number, CX = x, DX = y 
+						 
+						; for drawing ball in specific 
+				siz we need a loop and an starting position 
+						; starting position: 
+ 002E  8B 0E 000B R				MOV CX,BALL_X ; set the initial
+				 column (x)  
+ 0032  8B 16 000D R				MOV DX,BALL_Y ; set the initial
+				 line (y)  
+						 
+						; initializing the loops: 
+ 0036						DRAW_BALL_HORIZONTAL: 
+ 0036  B4 0C					MOV AH,0Ch ; set the configurat
+				ion to writing a pixel 
+ 0038  B0 0F					MOV AL,0Fh ; choosing color whi
+				te for pixel , 0fh is code for color white 
+ 003A  B7 00					MOV BH,00H ; setting the page n
+				umber to 0 since we only have 1 Page 
+ 003C  CD 10					INT 10h    ; execute the config
+				uration 
+ 003E  41			        INC CX     ; cx = cx + 1 
+						 
+						; now we need to implemnt the c
+				ommand to indicate the loop end 
+						; loop end condition :cx-BALL_X
+				>BALL_SIZE (T:end the loop , F:continue) 
+ 003F  8B C1					MOV AX,CX                   ; A
+				X as temp register 
+ 0041  2B 06 000B R		        SUB AX,BALL_X               ; CX - BALL
+				_X 
+ 0045  3B 06 000F R		        CMP AX,BALL_SIZE            ; cx-BALL_X
+				>BALL_SIZE 
+ 0049  7E EB			        JNG DRAW_BALL_HORIZONTAL 	; JUMP 
+				NOT GREATER	 
+ 004B  8B 0E 000B R				MOV CX,BALL_X               ; s
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-4
+
+
+				etting the cx to its initial value 
+ 004F  42					INC DX                      ; g
+				oing to the next line and drawing ball vertical
+				ly 
+						 
+						; vertical drawing condition : 
+				cx-BALL_Y>BALL_SIZE (T:exit the proc , F:contin
+				ue from the DRAW_BALL_HORIZONTAL lable) 
+ 0050  8B C2					MOV AX,DX   		       
+				 ; AX as temp register   
+ 0052  2B 06 000D R				SUB AX,BALL_Y               ; C
+				X - BALL_Y 
+ 0056  3B 06 000F R				CMP AX,BALL_SIZE            ; c
+				x-BALL_Y>BALL_SIZE 
+ 005A  7E DA					JNG DRAW_BALL_HORIZONTAL 
+						 
+ 005C  C3			        RET 
+ 005D				    DRAW_BALL ENDP	 
+				     
+ 005D					MOVE_BALL PROC NEAR 
+					 
+					 ; incresing the ball speed 
+ 005D  A1 0011 R					 MOV AX, BALL_VELOCITY_
+				X  ; move the ball horizontally 
+ 0060  01 06 000B R					 ADD BALL_X,AX         
+				   ; we should do it in 2 commands since we can
+				t have 2 variables in 1 operation 
+							                       
+				   ; check for collisions: 
+ 0064  A1 0004 R					 MOV AX,WINDOW_BOUNDS
+									
+					     
+ 0067  39 06 000B R					 CMP BALL_X,AX         
+				 ; BALL_X <0+WINDOW_BOUNDS : Y->collided 
+ 006B  7C 36						 JL RESET_POSITION 
+							  
+ 006D  A1 0000 R		             MOV AX, WINDOW_WIDTH 
+ 0070  2B 06 000F R		             SUB AX, BALL_SIZE		 
+ 0074  2B 06 0004 R		             SUB AX,WINDOW_BOUNDS	
+						  
+ 0078  39 06 000B R					 CMP BALL_X,AX         
+				   ; BALL_X >WINDOW_WIDTH - BALL_SIZE : Y->coll
+				ided 
+ 007C  7F 25						 JG RESET_POSITION 
+							  
+ 007E  A1 0013 R					 MOV AX, BALL_VELOCITY_
+				Y  ; move the ball vertically 
+ 0081  01 06 000D R					 ADD BALL_Y, AX 
+							                       
+				   ; check for collisions: 
+ 0085  A1 0004 R					 MOV AX,WINDOW_BOUNDS 
+ 0088  39 06 000D R		             CMP BALL_Y,AX            ; BALL_Y 
+				<0 +WINDOW_BOUNDS : Y->collided 
+ 008C  7C 15						 JL RESET_POSITION 
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-5
+
+
+							  
+ 008E  A1 0002 R					 MOV AX, WINDOW_HIGHT
+					 
+ 0091  2B 06 000F R		             SUB AX, BALL_SIZE 
+ 0095  2B 06 0004 R		             SUB AX, WINDOW_BOUNDS	
+						  
+ 0099  39 06 000D R					 CMP BALL_Y,AX         
+				   ; BALL_Y >WINDOW_HIGHT - BALL_SIZE: Y->colli
+				ded 
+ 009D  7F 00						 JG      
+doodle~1.asm(144): warning A4101: Missing data; zero assumed
+							  
+ 009F  E8 00AA R					 CALL CHECK_FOR_BALLCOL
+				LISION 
+							  
+							 ; if the BALL_VELOCITY
+				_Y is negative then it may never come back down
+				 
+							 ; we need to set condi
+				tion to check if the ball speed in negative and
+				  
+							 ; its Y position is eq
+				ual to a specific number then we set the  
+							 ; BALL_VELOCITY_Y back
+				 to positive  
+							 ; MOV AX, 10H 
+							 ; CMP BALL_Y, AX 
+							 ; JL  CHECK_SPEED 
+								  
+ 00A2  C3				          RET 
+							 ; CHECK_SPEED: 
+							    ; MOV AX, 0H 
+								; CMP BALL_VELO
+				CITY_Y, AX 
+								; JL RESET_SPEE
+				D 
+				 
+							 ; RESET_SPEED: 
+							    ; NEG BALL_VELOCITY
+				_Y 
+								; RET 
+								 
+ 00A3							  RESET_POSITION: 
+ 00A3  E8 00F0 R					     CALL RESET_BALL_PO
+				SITION   ; back to middle of the screen 
+ 00A6  E8 0159 R						 CALL RANDOM_PO
+				SITION 
+ 00A9  C3							 RET 
+								 
+ 00AA					MOVE_BALL ENDP 
+				     
+ 00AA					CHECK_FOR_BALLCOLLISION PROC NEAR  
+					;check if the ball is colliding with th
+				e platform 
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-6
+
+
+							 ; if PLATFORM_X=<BALL_
+				X+BALL_SIZE=<PLATFORM_X + PLATFORM_WIDTH 
+							 ; and if PLATFORM_Y <=
+				 BALL_Y+BALL_SIZE<= PLATFORM_Y+PLATFORM_HEIGHT 
+				-- also we can only check  
+							 ; if PLATFORM_Y=BALL_Y
+				 
+							 ; then the ball has hi
+				t the platform 
+							  
+ 00AA  A1 000B R					 MOV AX, BALL_X 
+ 00AD  03 06 000F R					 ADD AX, BALL_SIZE 
+ 00B1  3B 06 0015 R					 CMP AX, PLATFORM_X 
+ 00B5  7E 38						 JNG RETURN      ; now 
+				we need to check if the second part of the cond
+				ition is true 
+							  
+ 00B7  A1 000B R					 MOV AX, BALL_X 
+ 00BA  03 06 000F R					 ADD AX, BALL_SIZE 
+ 00BE  8B 1E 0015 R					 MOV BX, PLATFORM_X 
+ 00C2  03 1E 0019 R					 ADD BX, PLATFORM_WIDTH
+				 
+ 00C6  3B C3						 CMP AX,BX 
+ 00C8  7D 25						 JNL RETURN 
+							  
+ 00CA  A1 000D R					 MOV AX, BALL_Y 
+ 00CD  03 06 000F R					 ADD AX, BALL_SIZE 
+ 00D1  3B 06 0017 R					 CMP AX, PLATFORM_Y 
+ 00D5  7E 18						 JNG RETURN 
+							  
+ 00D7  A1 000D R					 MOV AX, BALL_Y 
+ 00DA  03 06 000F R					 ADD AX, BALL_SIZE 
+ 00DE  8B 1E 0017 R					 MOV BX, PLATFORM_Y 
+ 00E2  03 1E 001B R					 ADD BX, PLATFORM_HEIGH
+				T 
+ 00E6  3B C3						 CMP AX,BX 
+ 00E8  7D 05						 JNL RETURN            
+				      
+							  
+							 ; if it reaches this p
+				oint it means the ball is collindong with the p
+				latform 
+							  
+ 00EA  F7 1E 0013 R					 NEG BALL_VELOCITY_Y   
+				  ; reverse the ball vertical 
+ 00EE  C3				         RET  
+							  
+ 00EF							 RETURN : 
+ 00EF  C3							 RET 
+					 
+ 00F0					CHECK_FOR_BALLCOLLISION ENDP 
+					 
+ 00F0					RESET_BALL_POSITION PROC NEAR 
+ 00F0  A1 0007 R			        MOV AX, BALL_ORIGINAL_X 
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-7
+
+
+ 00F3  A3 000B R					MOV BALL_X,AX 
+							 
+ 00F6  A1 0009 R				    MOV AX,BALL_ORIGINAL_Y 
+ 00F9  A3 000D R					MOV BALL_Y,AX 
+ 00FC  C3				        RET 
+ 00FD					RESET_BALL_POSITION ENDP 
+					 
+ 00FD					MOVE_BALL_WITH_KEYS PROC NEAR 
+					 
+					; we want to move the ball in order to 
+				help it hit the platform 
+					; in order to do so , we use keys 'J' o
+				r 'j' for moving left 
+					; and 'k' or 'K' for moving right 
+					; we use int 16 system call and zf flag
+				 to define getting inputs from keyboard 
+ 00FD  B4 01				MOV AH,01H 
+ 00FF  CD 16				INT 16H       ; calling the system call
+				 to read from keyboard 
+ 0101  74 26				JZ EXIT_BALL_MOVEMENT   ; JZ CHECKS ZF 
+				, if ZF=0 then jump to label 
+					; now we need to check which key is pre
+				ssed 
+				    ; AH = keyboard scan code , AL=ASCII charac
+				ter or zero	 
+ 0103  B4 00				MOV AH,00H 
+ 0105  CD 16				INT 16H 
+					; ASCII codes for J=4ah , K=4bh, j=6ah,
+				 k=6bh  
+					; we need to check for each one : 
+ 0107  3C 4A				CMP AL,4AH     ;J is pressed 
+ 0109  74 0C				JE MOVE_BALL_LEFT 
+ 010B  3C 6A				CMP AL,6AH     ;j is pressed 
+ 010D  74 08				JE MOVE_BALL_LEFT 
+					 
+ 010F  3C 4B				CMP AL,4BH     ;K is pressed 
+ 0111  74 0D				JE MOVE_BALL_RIGHT 
+ 0113  3C 6B				CMP AL,6BH     ;k is pressed 
+ 0115  74 09				JE MOVE_BALL_RIGHT 
+					 
+ 0117					MOVE_BALL_LEFT: 
+ 0117  A1 0011 R			    MOV AX,BALL_VELOCITY_X 
+ 011A  29 06 000B R				SUB BALL_X,AX 
+ 011E  EB DD					JMP MOVE_BALL_WITH_KEYS 
+					 
+ 0120					MOVE_BALL_RIGHT: 
+ 0120  A1 0011 R			    MOV AX,BALL_VELOCITY_X 
+ 0123  01 06 000B R				ADD BALL_X,AX 
+ 0127  EB D4					JMP MOVE_BALL_WITH_KEYS 
+ 0129					EXIT_BALL_MOVEMENT: 
+ 0129  C3				    RET 
+ 012A					MOVE_BALL_WITH_KEYS ENDP 
+					 
+					 
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-8
+
+
+ 012A					DRAW_PLATFORM PROC NEAR 
+					 
+					                         ; drawing the 
+				platform 
+ 012A  8B 0E 0015 R			MOV CX,PLATFORM_X        ; set the init
+				ial column (x) 
+ 012E  8B 16 0017 R			MOV DX,PLATFORM_Y        ; set the init
+				ial line (y) 
+					 
+					 
+ 0132					DRAW_PLATFORM_VERTICAL : 
+ 0132  B4 0C				   MOV AH,0Ch            ;set the confi
+				guration to draw a pixel 
+ 0134  B0 0F				   MOV AL,0fh            ;choose white 
+				as color 
+ 0136  B7 00				   MOV BH,00H            ;set the page 
+				number (we only have one page => set it to 0) 
+ 0138  CD 10				   INT 10H               ; execute the 
+				configuration by calling the relevant system CA
+				LL 
+					    
+ 013A  41				   INC CX                ; cx = cx + 1 
+ 013B  8B C1				   MOV AX,CX             ; AX as temp r
+				egister 
+ 013D  2B 06 0015 R		       SUB AX,PLATFORM_X     ; CX - PLATFORM_X 
+ 0141  3B 06 0019 R		       CMP AX,PLATFORM_WIDTH ; cx-PLATFORM_X>PL
+				ATFORM_WIDTH 
+ 0145  7E EB			       JNG DRAW_PLATFORM_VERTICAL 
+					    
+ 0147  8B 0E 0015 R			   MOV CX,PLATFORM_X 
+ 014B  42				   INC DX 
+					    
+ 014C  8B C2				   MOV AX,DX 
+ 014E  2B 06 0017 R			   SUB AX,PLATFORM_Y 
+ 0152  3B 06 001B R			   CMP AX,PLATFORM_HEIGHT 
+ 0156  7E DA				   JNG DRAW_PLATFORM_VERTICAL 
+					    
+ 0158  C3				RET 
+ 0159					DRAW_PLATFORM ENDP	 
+					 
+ 0159					RANDOM_POSITION PROC NEAR	 
+					                
+					              ; we only need to change 
+				the position of platform when we have collision
+				s 
+					              ; creating random positio
+				n for platform 
+ 0159  B4 00				MOV AH, 00h   ; interrupt to get system
+				 timer in CX:DX  
+ 015B  CD 1A			    INT 1AH 
+ 015D  83 C2 0C				ADD DX,12 
+ 0160  B8 002B				MOV AX,43 
+ 0163  F7 E2			    MUL DX        ; DX*DX 
+ 0165  8B C2			    MOV AX,DX     ; we move dx to ax since the 
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-9
+
+
+				ax stores the default operand in div 
+ 0167  B9 0140				MOV CX,320    ; page limit 
+ 016A  F7 F1				DIV CX        ; the reminder is stored 
+				in dx  
+ 016C  01 16 0015 R			ADD PLATFORM_X,DX  
+					              ; checking for collisions
+				 
+					;;MOV AX,WINDOW_WIDTH 
+					;;SUB AX , 1fh  ; platform width , if P
+				LATFORM_X>WINDOW_WIDTH-PLATFORM_WIDTH -> collis
+				ion 
+					;;CMP PLATFORM_X,AX 
+					;;JG RESET_X_POSITION 
+					 
+ 0170  B4 00				MOV AH, 00h   ; interrupt to get system
+				 timer in CX:DX  
+ 0172  CD 1A			    INT 1AH 
+ 0174  83 C2 38				ADD DX,56 
+ 0177  B8 0057				MOV AX,87 
+ 017A  F7 E2			    MUL DX        ; DX*DX 
+ 017C  8B C2			    MOV AX,DX     ; we move dx to ax since the 
+				ax stores the default operand in div 
+ 017E  B9 00C8				MOV CX,200    ; page limit 
+ 0181  F7 F1				DIV CX        ; the reminder is stored 
+				in dx  
+ 0183  83 C2 15				ADD DX, 15H   ; since the original posi
+				tion of the ball is 05h, the platform should  
+					              ; begin somewhere below t
+				hat , so we add it to 15h 
+ 0186  01 16 0017 R			ADD PLATFORM_Y,DX 
+					 
+					              ; checking for collisions
+				 
+					;;MOV AX,WINDOW_HIGHT 
+					;;CMP PLATFORM_Y,AX 
+					;;JG RESET_Y_POSITION 
+					 
+					;;RESET_X_POSITION: 
+					 ;;MOV AX,010Ah 
+					 ;;SUB PLATFORM_X ,AX 
+				      
+					  
+					;;RESET_Y_POSITION: 
+					  ;;MOV AX,010Ah 
+					  ;;SUB PLATFORM_Y ,AX 
+					   
+					              
+ 018A  C3				RET 
+ 018B					RANDOM_POSITION ENDP 
+				    ;in order to avoid repitation we create the
+				 clear screen proc  
+ 018B				    CLEAR_SCREEN PROC NEAR 
+					         ; in order to improve the game
+				s quality , we can only remove ball not the who
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Page     1-10
+
+
+				le screen 
+					         ;cleaning the screen with sett
+				ing the background again 
+							  
+							 ; setting in initials 
+				of video mode 
+ 018B  B4 00				         MOV AH,00H ; set the configura
+				tion to  video mode  
+					         ; video mode 13  320x200 256 c
+				olor graphics (MCGA,VGA): 
+ 018D  B0 13				         MOV AL,13H ; choose the video 
+				mode 
+						     ;command above is the vide
+				o mode we chose among INT 10h-0 video modes 
+ 018F  CD 10			             INT 10H    ; execute the configura
+				tion  
+						     ;command above is for call
+				ing the interrupt to execute 
+							  
+ 0191  B4 0B					     MOV AH,0Bh ; set the confi
+				guration 
+ 0193  B7 00					     MOV BH,00h ; to the backgr
+				oung color  
+ 0195  B3 00					     MOV BL,00h ; we choose the
+				 black as background ,00h is the code for color
+				 black 
+ 0197  CD 10					     INT 10h    ; we use the in
+				terrupt to set the background 
+							  
+ 0199  C3						 RET  
+ 019A					CLEAR_SCREEN ENDP 
+				    	 
+				     
+ 019A				CODE ENDS 
+				END 
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Symbols-1
+
+
+Segments and Groups:
+
+                N a m e         	Length	 Align	Combine Class
+
+CODE . . . . . . . . . . . . . .  	019A	PARA	NONE	'CODE'
+DATA . . . . . . . . . . . . . .  	001D	PARA	NONE	'DATA'
+STACK  . . . . . . . . . . . . .  	0040	PARA	STACK	
+
+Symbols:            
+
+                N a m e         	Type	 Value	 Attr
+
+BALL_ORIGINAL_X  . . . . . . . .  	L WORD	0007	DATA
+BALL_ORIGINAL_Y  . . . . . . . .  	L WORD	0009	DATA
+BALL_SIZE  . . . . . . . . . . .  	L WORD	000F	DATA
+BALL_VELOCITY_X  . . . . . . . .  	L WORD	0011	DATA
+BALL_VELOCITY_Y  . . . . . . . .  	L WORD	0013	DATA
+BALL_X . . . . . . . . . . . . .  	L WORD	000B	DATA
+BALL_Y . . . . . . . . . . . . .  	L WORD	000D	DATA
+
+CHECK_FOR_BALLCOLLISION  . . . .  	N PROC	00AA	CODE	Length = 0046
+CHECK_TIME . . . . . . . . . . .  	L NEAR	000E	CODE
+CLEAR_SCREEN . . . . . . . . . .  	N PROC	018B	CODE	Length = 000F
+
+DRAW_BALL  . . . . . . . . . . .  	N PROC	002E	CODE	Length = 002F
+DRAW_BALL_HORIZONTAL . . . . . .  	L NEAR	0036	CODE
+DRAW_PLATFORM  . . . . . . . . .  	N PROC	012A	CODE	Length = 002F
+DRAW_PLATFORM_VERTICAL . . . . .  	L NEAR	0132	CODE
+
+EXIT_BALL_MOVEMENT . . . . . . .  	L NEAR	0129	CODE
+
+MAIN . . . . . . . . . . . . . .  	F PROC	0000	CODE	Length = 002E
+MOVE_BALL  . . . . . . . . . . .  	N PROC	005D	CODE	Length = 004D
+MOVE_BALL_LEFT . . . . . . . . .  	L NEAR	0117	CODE
+MOVE_BALL_RIGHT  . . . . . . . .  	L NEAR	0120	CODE
+MOVE_BALL_WITH_KEYS  . . . . . .  	N PROC	00FD	CODE	Length = 002D
+
+PLATFORM_HEIGHT  . . . . . . . .  	L WORD	001B	DATA
+PLATFORM_WIDTH . . . . . . . . .  	L WORD	0019	DATA
+PLATFORM_X . . . . . . . . . . .  	L WORD	0015	DATA
+PLATFORM_Y . . . . . . . . . . .  	L WORD	0017	DATA
+
+RANDOM_POSITION  . . . . . . . .  	N PROC	0159	CODE	Length = 0032
+RESET_BALL_POSITION  . . . . . .  	N PROC	00F0	CODE	Length = 000D
+RESET_POSITION . . . . . . . . .  	L NEAR	00A3	CODE
+RETURN . . . . . . . . . . . . .  	L NEAR	00EF	CODE
+
+TIME_AUX . . . . . . . . . . . .  	L BYTE	0006	DATA
+
+WINDOW_BOUNDS  . . . . . . . . .  	L WORD	0004	DATA
+WINDOW_HIGHT . . . . . . . . . .  	L WORD	0002	DATA
+WINDOW_WIDTH . . . . . . . . . .  	L WORD	0000	DATA
+
+@FILENAME  . . . . . . . . . . .  	TEXT  doodle~1		
+Microsoft (R) Macro Assembler Version 5.00                  4/16/23 12:01:16
+                                                             Symbols-2
+
+
+
+
+    363 Source  Lines
+    363 Total   Lines
+     37 Symbols
+
+  51230 + 448930 Bytes symbol space free
+
+      1 Warning Errors
+      0 Severe  Errors
