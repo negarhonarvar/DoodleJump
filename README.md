@@ -1,6 +1,6 @@
 # Doodle Jump Game (Assembly x86) 
 
-In This Repository I Implemented a simple version of doodle jump game with red squared-shape bugs , green broken platforms and white platfroms. The Main charachter of the game you get to play with is a with rounded ball which can be moved to left or right with j and k bottoms.
+In This Repository I Implemented a simple version of doodle jump game with red squared-shape bugs , green broken platforms and white platfroms. The Main charachter of the game you get to play with is a white rounded ball which can be moved to left or right with j and k bottoms.
 
 # How to Run The Game
 
